@@ -66,6 +66,7 @@ function add(todo) {
     parentId: todo.parentId || null,
     date,
     link: normalizeLink(todo.link),
+    mindmap: normalizeMindmap(todo.mindmap),
     countdownTotalMinutes: countdownTotal,
     countdownStartedAt: countdownTotal != null && countdownTotal > 0 ? now : null,
     countdownValue: countdownTotal != null && countdownTotal > 0 && todo.countdown && todo.countdown.value > 0 ? todo.countdown.value : null,
@@ -91,6 +92,7 @@ function update(id, patch) {
   if (patch.parentId !== undefined) next.parentId = patch.parentId;
   if (patch.date !== undefined) next.date = normalizeDate(patch.date);
   if (patch.link !== undefined) next.link = normalizeLink(patch.link);
+  if (patch.mindmap !== undefined) next.mindmap = normalizeMindmap(patch.mindmap);
   if (patch.countdown !== undefined) {
     const total = normalizeCountdownTotal(patch.countdown);
     next.countdownTotalMinutes = total;
@@ -156,6 +158,22 @@ function normalizeLink(v) {
   if (v == null || v === '') return null;
   const s = String(v).trim();
   return s.length > 0 ? s : null;
+}
+
+/** 脑图：存为 JSON 字符串，无效或空则 null */
+function normalizeMindmap(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v); } catch (e) { return null; }
+  }
+  const s = String(v).trim();
+  if (s.length === 0) return null;
+  try {
+    JSON.parse(s);
+    return s;
+  } catch (e) {
+    return null;
+  }
 }
 
 /** countdown: { value: number, unit: 'minute'|'hour'|'day' } => 总分钟数，无效则 null */

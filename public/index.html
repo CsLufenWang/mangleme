@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>忙了么</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/jsmind@0.8.7/style/jsmind.css">
 </head>
 <body>
   <header class="header">
@@ -142,6 +143,9 @@
             <span class="countdown-hint">留空或 0 表示不设倒计时</span>
           </span>
         </p>
+        <p class="mindmap-row">
+          <button type="button" id="btnMindmap" class="btn-mindmap">设置脑图</button>
+        </p>
         <p class="modal-actions">
           <button type="submit">保存</button>
           <button type="button" id="btnCancel">取消</button>
@@ -150,6 +154,17 @@
       </form>
     </div>
   </div>
+  <div id="mindmapModalOverlay" class="modal-overlay mindmap-overlay hidden" aria-hidden="true">
+    <div id="mindmapModal" class="mindmap-modal">
+      <div class="mindmap-modal-header">
+        <span class="mindmap-modal-title">编辑脑图</span>
+        <button type="button" id="mindmapModalClose" class="mindmap-modal-close" aria-label="关闭">×</button>
+      </div>
+      <p class="mindmap-shortcut-hint">Insert / 回车：新增节点；Delete：删除节点；可拖拽右下角拉大窗口</p>
+      <div id="jsmind_container" class="jsmind-container"></div>
+    </div>
+  </div>
+  <script type="text/javascript" src="https://unpkg.com/jsmind@0.8.7/es6/jsmind.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

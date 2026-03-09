@@ -42,6 +42,64 @@
   const calendarPanel = document.getElementById('calendarPanel');
 
   const DAY_STATS_COLLAPSED_KEY = 'dayStatsCollapsed';
+  let jm = null;
+  /** 当前编辑中的待办的脑图数据（打开编辑/新建时设置，用于打开脑图弹框时加载） */
+  let currentEditMindmap = null;
+
+  /**
+   * 初始化或刷新脑图：根节点固定为当前待办标题
+   * @param {string|null} mindmapStr - 已保存的脑图 JSON 字符串
+   * @param {string} rootTopic - 根节点文案（此待办标题）
+   */
+  function initMindmap(mindmapStr, rootTopic) {
+    if (typeof jsMind === 'undefined') return;
+    const container = document.getElementById('jsmind_container');
+    if (!container) return;
+    if (!jm) {
+      jm = new jsMind({
+        container: 'jsmind_container',
+        editable: true,
+        theme: 'primary',
+        view: {
+          draggable: true,
+        },
+      });
+    }
+    const title = (rootTopic && String(rootTopic).trim()) ? String(rootTopic).trim() : '未命名待办';
+    let mind = null;
+    if (mindmapStr && String(mindmapStr).trim()) {
+      try {
+        mind = typeof mindmapStr === 'string' ? JSON.parse(mindmapStr) : mindmapStr;
+      } catch (e) {}
+    }
+    if (mind && mind.data) {
+      mind.data.topic = title;
+      jm.show(mind);
+    } else {
+      mind = {
+        meta: { name: '', author: '', version: '1.0' },
+        format: 'node_tree',
+        data: { id: 'root', topic: title, children: [] },
+      };
+      jm.show(mind);
+    }
+  }
+
+  const mindmapModalOverlay = document.getElementById('mindmapModalOverlay');
+  const mindmapModalClose = document.getElementById('mindmapModalClose');
+  const btnMindmap = document.getElementById('btnMindmap');
+
+  function openMindmapModal() {
+    if (mindmapModalOverlay) mindmapModalOverlay.classList.remove('hidden');
+    if (mindmapModalOverlay) mindmapModalOverlay.setAttribute('aria-hidden', 'false');
+    const rootTopic = todoTitle ? (todoTitle.value || '').trim() : '';
+    setTimeout(() => initMindmap(currentEditMindmap, rootTopic || '未命名待办'), 50);
+  }
+
+  function closeMindmapModal() {
+    if (mindmapModalOverlay) mindmapModalOverlay.classList.add('hidden');
+    if (mindmapModalOverlay) mindmapModalOverlay.setAttribute('aria-hidden', 'true');
+  }
 
   const NOTE_COLORS = ['note-yellow', 'note-pink', 'note-blue', 'note-green', 'note-orange'];
 
@@ -451,6 +509,7 @@
     todoCountdownUnit.value = 'minute';
     btnDelete.classList.add('hidden');
     modalOverlay.classList.remove('hidden');
+    currentEditMindmap = null;
   }
 
   function openEdit(id) {
@@ -476,6 +535,7 @@
         todoCountdownUnit.value = t.countdownUnit || 'minute';
         btnDelete.classList.remove('hidden');
         modalOverlay.classList.remove('hidden');
+        currentEditMindmap = t.mindmap || null;
       })
       .catch(console.error);
   }
@@ -492,6 +552,16 @@
     const datePart = todoDate.value.trim();
     const timePart = (todoTime && todoTime.value) ? todoTime.value.trim() : '';
     const date = datePart ? (timePart ? datePart + 'T' + (timePart.length === 5 ? timePart + ':00' : timePart) : datePart) : null;
+    let mindmap = null;
+    try {
+      if (jm) {
+        const mind = jm.get_data('node_tree');
+        if (mind && mind.data) {
+          mind.data.topic = todoTitle.value.trim() || '未命名待办';
+          mindmap = JSON.stringify(mind);
+        }
+      }
+    } catch (err) {}
     const body = {
       title: todoTitle.value.trim(),
       description: todoDesc.value.trim(),
@@ -500,6 +570,7 @@
       date: date,
       link: todoLink.value.trim() || null,
       countdown: countdown,
+      mindmap: mindmap,
     };
     if (id) {
       fetch(API + '/' + id, {
@@ -625,7 +696,11 @@
 
   btnNew.addEventListener('click', openNew);
   btnCancel.addEventListener('click', closeModal);
-  modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+  todoForm.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault();
+  });
+  if (btnMindmap) btnMindmap.addEventListener('click', openMindmapModal);
+  if (mindmapModalClose) mindmapModalClose.addEventListener('click', closeMindmapModal);
   sortSelect.addEventListener('change', fetchList);
 
   function escapeHtml(s) {
