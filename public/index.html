@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>忙了么</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>忙了么 <span class="header-author">author: CSLufenWang</span></h1>
+    <div class="toolbar">
+      <button type="button" id="btnNew" class="btn-new">新建待办</button>
+    </div>
+  </header>
+  <main class="main">
+    <section class="list-panel">
+      <div class="list-panel-header">
+        <h2>推荐处理顺序</h2>
+        <select id="sortBy">
+          <option value="urgent">按紧急性</option>
+          <option value="important">按重要性</option>
+          <option value="score" selected>按系数 (0.33 紧急 + 0.67 重要)</option>
+        </select>
+      </div>
+      <ul id="recommendList" class="todo-list"></ul>
+    </section>
+    <section class="canvas-panel">
+      <div class="canvas-calendar-wrap">
+        <div class="canvas-wrap">
+          <div id="canvasBoard" class="canvas-board">
+            <div class="canvas-quadrants">
+              <div class="quadrant q1" title="重要且紧急"></div>
+              <div class="quadrant q2" title="重要不紧急"></div>
+              <div class="quadrant q3" title="紧急不重要"></div>
+              <div class="quadrant q4" title="不重要不紧急"></div>
+            </div>
+            <div class="canvas-axis canvas-axis-y">
+              <span class="axis-label">重要性 (I)</span>
+              <span class="axis-tick">10</span><span class="axis-tick">9</span><span class="axis-tick">8</span><span class="axis-tick">7</span><span class="axis-tick">6</span>
+              <span class="axis-tick">5</span><span class="axis-tick">4</span><span class="axis-tick">3</span><span class="axis-tick">2</span><span class="axis-tick">1</span>
+            </div>
+            <div class="canvas-axis canvas-axis-x">
+              <span class="axis-tick">1</span><span class="axis-tick">2</span><span class="axis-tick">3</span><span class="axis-tick">4</span><span class="axis-tick">5</span>
+              <span class="axis-tick">6</span><span class="axis-tick">7</span><span class="axis-tick">8</span><span class="axis-tick">9</span><span class="axis-tick">10</span>
+              <span class="axis-label">紧急性 (E)</span>
+            </div>
+            <div id="canvasNotes" class="canvas-notes"></div>
+          </div>
+        </div>
+        <div id="calendarPanel" class="calendar-panel">
+          <div class="calendar-header-row">
+            <button type="button" id="calendarPrev" class="calendar-nav" aria-label="上一月">‹</button>
+            <span id="calendarTitle" class="calendar-title">2026年3月</span>
+            <button type="button" id="calendarNext" class="calendar-nav" aria-label="下一月">›</button>
+          </div>
+          <div class="calendar-buttons">
+            <button type="button" id="calendarShowAll" class="calendar-btn">全部</button>
+            <button type="button" id="calendarToday" class="calendar-btn calendar-btn-today">当天</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div id="calendarDays" class="calendar-days"></div>
+          <div id="expiredBox" class="expired-box">
+            <div class="expired-box-title">🪦 已过期</div>
+            <ul id="expiredList" class="expired-list"></ul>
+          </div>
+          <div id="deadlineWarnings" class="deadline-warnings">
+            <div class="deadline-warnings-title">⏰ 快要到 deadline 了</div>
+            <ul id="deadlineWarningsList" class="deadline-warnings-list"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+    <aside id="todayStatsBox" class="today-stats-box" aria-label="该日待办分区" role="region">
+      <div id="dayStatsHeader" class="today-stats-header" role="button" tabindex="0" aria-expanded="true" aria-label="展开或收起该日待办">
+        <span id="dayStatsTitle" class="today-stats-title">该日待办</span>
+        <span id="dayStatsChevron" class="today-stats-chevron" aria-hidden="true">▼</span>
+      </div>
+      <div id="dayStatsBody" class="today-stats-body">
+        <div class="today-stats-row today-stats-grave">
+          <span class="today-stats-icon" aria-hidden="true">🪦</span>
+          <span class="today-stats-label">坟墓区</span>
+          <span id="todayStatsGrave" class="today-stats-count">0</span>
+        </div>
+        <div class="today-stats-row today-stats-icu">
+          <span class="today-stats-icon" aria-hidden="true">🏥</span>
+          <span class="today-stats-label">ICU区</span>
+          <span id="todayStatsIcu" class="today-stats-count">0</span>
+        </div>
+        <div class="today-stats-row today-stats-healthy">
+          <span class="today-stats-icon" aria-hidden="true">🌱</span>
+          <span class="today-stats-label">活力区</span>
+          <span id="todayStatsHealthy" class="today-stats-count">0</span>
+        </div>
+        <div class="today-stats-row today-stats-done">
+          <span class="today-stats-icon" aria-hidden="true">✅</span>
+          <span class="today-stats-label">完活区</span>
+          <span id="todayStatsDone" class="today-stats-count">0</span>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="modalTitle">新建待办</h3>
+      <form id="todoForm">
+        <input type="hidden" id="todoId">
+        <p>
+          <label>标题 <input type="text" id="todoTitle" required></label>
+        </p>
+        <p>
+          <label>描述 <textarea id="todoDesc" rows="2"></textarea></label>
+        </p>
+        <p>
+          <label>重要性 1-10 <input type="number" id="todoImportant" min="1" max="10" value="5"></label>
+        </p>
+        <p>
+          <label>紧急性 1-10 <input type="number" id="todoUrgent" min="1" max="10" value="5"></label>
+        </p>
+        <p class="datetime-row">
+          <label>日期与时间</label>
+          <span class="datetime-inputs">
+            <input type="date" id="todoDate" aria-label="日期">
+            <input type="time" id="todoTime" step="1" placeholder="可选 时:分:秒" aria-label="时间">
+          </span>
+          <span class="datetime-hint">不选时间则仅按日期</span>
+        </p>
+        <p>
+          <label>链接 <input type="url" id="todoLink" placeholder="https://..."></label>
+        </p>
+        <p class="countdown-row">
+          <label>时限（倒计时）</label>
+          <span class="countdown-inputs">
+            <input type="number" id="todoCountdownValue" min="0" step="1" placeholder="数">
+            <select id="todoCountdownUnit">
+              <option value="minute">分钟</option>
+              <option value="hour">小时</option>
+              <option value="day">天</option>
+            </select>
+            <span class="countdown-hint">留空或 0 表示不设倒计时</span>
+          </span>
+        </p>
+        <p class="modal-actions">
+          <button type="submit">保存</button>
+          <button type="button" id="btnCancel">取消</button>
+          <button type="button" id="btnDelete" class="danger hidden">删除</button>
+        </p>
+      </form>
+    </div>
+  </div>
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "todo-assistant",
+  "version": "1.0.0",
+  "description": "轻量级个人待办助手",
+  "main": "src/server/index.js",
+  "scripts": {
+    "start": "node src/server/index.js",
+    "postinstall": "node scripts/copy-vendor.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sortablejs": "^1.15.0"
+  }
+}
