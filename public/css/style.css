@@ -32,6 +32,16 @@ body { margin: 0; font-family: sans-serif; background: #f6f7fb; }
   transform: translateY(-1px);
 }
 .toolbar .btn-new:active { transform: translateY(0); }
+.toolbar .btn-notify-permission {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+}
+.toolbar .btn-notify-permission:hover { background: rgba(255, 255, 255, 0.35); }
 .modal-actions button { padding: 8px 14px; cursor: pointer; }
 .main {
   display: grid;

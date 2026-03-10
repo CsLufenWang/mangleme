@@ -13,6 +13,7 @@
   const todoImportant = document.getElementById('todoImportant');
   const todoUrgent = document.getElementById('todoUrgent');
   const btnNew = document.getElementById('btnNew');
+  const btnNotifyPermission = document.getElementById('btnNotifyPermission');
   const btnCancel = document.getElementById('btnCancel');
   const btnDelete = document.getElementById('btnDelete');
   const calendarTitle = document.getElementById('calendarTitle');
@@ -42,6 +43,14 @@
   const calendarPanel = document.getElementById('calendarPanel');
 
   const DAY_STATS_COLLAPSED_KEY = 'dayStatsCollapsed';
+  /** 上一轮已过期/即将到期 id 集合，用于仅在新进入告警时发浏览器通知 */
+  let lastKnownExpiredIds = new Set();
+  let lastKnownWarningIds = new Set();
+  let firstExpiredFetch = true;
+  let firstWarningFetch = true;
+  /** 当前已过期/即将到期列表，供每 5 分钟重复提醒使用 */
+  let lastFetchedExpired = [];
+  let lastFetchedWarnings = [];
   let jm = null;
   /** 当前编辑中的待办的脑图数据（打开编辑/新建时设置，用于打开脑图弹框时加载） */
   let currentEditMindmap = null;
@@ -602,7 +611,11 @@
   function fetchExpired() {
     fetch(API + '/expired')
       .then((r) => r.json())
-      .then(renderExpired)
+      .then((items) => {
+        lastFetchedExpired = items || [];
+        renderExpired(items);
+        checkAndNotifyExpired(items);
+      })
       .catch(() => { if (expiredList) expiredList.innerHTML = ''; });
   }
 
@@ -637,9 +650,85 @@
   function fetchDeadlineWarnings() {
     fetch(API + '/deadline-warnings')
       .then((r) => r.json())
-      .then(renderDeadlineWarnings)
+      .then((items) => {
+        lastFetchedWarnings = items || [];
+        renderDeadlineWarnings(items);
+        checkAndNotifyWarnings(items);
+      })
       .catch(() => { if (deadlineWarningsList) deadlineWarningsList.innerHTML = ''; });
   }
+
+  /**
+   * 新进入告警时尝试发送浏览器通知（已过期）
+   */
+  function checkAndNotifyExpired(items) {
+    const currentIds = new Set((items || []).map((t) => t.id));
+    const newItems = (items || []).filter((t) => !lastKnownExpiredIds.has(t.id));
+    lastKnownExpiredIds = currentIds;
+    if (firstExpiredFetch) {
+      firstExpiredFetch = false;
+      return;
+    }
+    if (newItems.length > 0) tryNotifyAlerts('expired', newItems);
+  }
+
+  /**
+   * 新进入告警时尝试发送浏览器通知（即将到期）
+   */
+  function checkAndNotifyWarnings(items) {
+    const currentIds = new Set((items || []).map((t) => t.id));
+    const newItems = (items || []).filter((t) => !lastKnownWarningIds.has(t.id));
+    lastKnownWarningIds = currentIds;
+    if (firstWarningFetch) {
+      firstWarningFetch = false;
+      return;
+    }
+    if (newItems.length > 0) tryNotifyAlerts('warning', newItems);
+  }
+
+  /**
+   * 若支持且用户允许，弹出系统级告警通知
+   * @param {'expired'|'warning'} type
+   * @param {Array<{id:string, title?: string, remainingText?: string}>} newItems
+   */
+  function tryNotifyAlerts(type, newItems) {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then((p) => {
+        if (p === 'granted') showAlertNotification(type, newItems);
+      });
+      return;
+    }
+    if (Notification.permission === 'granted') showAlertNotification(type, newItems);
+  }
+
+  function showAlertNotification(type, newItems) {
+    if (!newItems.length) return;
+    const title = type === 'expired' ? '🪦 待办已过期' : '⏰ 待办即将到期';
+    const names = newItems.slice(0, 2).map((t) => (t.title || '未命名').trim() || '未命名');
+    const body = names.join('、') + (newItems.length > 2 ? ' 等 ' + newItems.length + ' 项' : '');
+    const n = new Notification(title, { body, tag: 'todo-alert-' + type });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  }
+
+  /** 每 5 分钟若仍有告警则再通知一遍 */
+  const FIVE_MIN_MS = 5 * 60 * 1000;
+  setInterval(() => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const expiredCount = lastFetchedExpired.length;
+    const warningCount = lastFetchedWarnings.length;
+    if (expiredCount === 0 && warningCount === 0) return;
+    const title = '⏰ 截止告警提醒';
+    const body = [expiredCount > 0 ? expiredCount + ' 个已过期' : '', warningCount > 0 ? warningCount + ' 个即将到期' : ''].filter(Boolean).join('，') + '，请及时处理';
+    const n = new Notification(title, { body, tag: 'todo-alert-periodic' });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  }, FIVE_MIN_MS);
 
   function fetchDayStats() {
     const q = selectedDate ? '?date=' + encodeURIComponent(selectedDate) : '';
@@ -695,6 +784,30 @@
   });
 
   btnNew.addEventListener('click', openNew);
+  if (btnNotifyPermission) {
+    btnNotifyPermission.addEventListener('click', () => {
+      if (typeof Notification === 'undefined') {
+        btnNotifyPermission.textContent = '当前浏览器不支持';
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        const t = btnNotifyPermission.textContent;
+        btnNotifyPermission.textContent = '已开启';
+        setTimeout(() => { btnNotifyPermission.textContent = t; }, 2000);
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        btnNotifyPermission.textContent = '已在浏览器中禁止';
+        setTimeout(() => { btnNotifyPermission.textContent = '开启提醒'; }, 2000);
+        return;
+      }
+      Notification.requestPermission().then((p) => {
+        const t = btnNotifyPermission.textContent;
+        btnNotifyPermission.textContent = p === 'granted' ? '已开启' : '未允许';
+        setTimeout(() => { btnNotifyPermission.textContent = t; }, 2000);
+      });
+    });
+  }
   btnCancel.addEventListener('click', closeModal);
   todoForm.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault();
